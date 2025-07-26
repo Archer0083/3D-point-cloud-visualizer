@@ -4,7 +4,7 @@
 
 一个基于Web的、功能强大的、交互式三维点云和模型可视化分析工具。无需安装任何软件，直接在浏览器中运行。
 
-[**在线访问 (Live Demo)**](https://Archer0083.github.io/3D-point-cloud-visualizer)
+[**在线访问 (Live Demo)**](https://Archer0083.github.io/3D-point-cloud-visualizer/)
 
 ---
 
@@ -45,7 +45,7 @@
 
 ### 如何使用
 
-1.  **在线使用**: 直接访问上方的 [Live Demo](https://Archer0083.github.io/3D-point-cloud-visualizer) 链接。
+1.  **在线使用**: 直接访问上方的 [Live Demo](https://Archer0083.github.io/3D-point-cloud-visualizer/) 链接。
 2.  **本地运行**:
     * 下载本仓库中的 `index.html` 文件。
     * 用您的网页浏览器（如Chrome, Edge, Firefox）直接打开该文件即可。

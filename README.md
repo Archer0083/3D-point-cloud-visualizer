@@ -10,11 +10,11 @@
 
 ### 项目演示
 
-![应用截图](./example.jpg)
+![应用截图](https://raw.githubusercontent.com/Archer0083/3D-point-cloud-visualizer/main/example.jpg)
 
-*点击上方图片可观看操作演示视频*
+*点击上方图片可跳转至YouTube观看操作演示视频*
 
-[![点击观看操作演示](./example.jpg)](./example_demo_test.mp4)
+[![操作演示视频封面](https://raw.githubusercontent.com/Archer0083/3D-point-cloud-visualizer/main/example.jpg)](https://www.youtube.com/watch?v=4n_GEKv2YSo)
 
 
 ### 核心功能特点

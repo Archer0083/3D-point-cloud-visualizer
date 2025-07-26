@@ -10,9 +10,7 @@
 
 ### 项目演示
 
-![应用截图](https://raw.githubusercontent.com/Archer0083/3D-point-cloud-visualizer/main/example.jpg)
-
-*点击上方图片可跳转至YouTube观看操作演示视频*
+*点击下方链接可跳转至YouTube观看操作演示视频*
 
 [![操作演示视频封面](https://raw.githubusercontent.com/Archer0083/3D-point-cloud-visualizer/main/example.jpg)](https://www.youtube.com/watch?v=4n_GEKv2YSo)
 

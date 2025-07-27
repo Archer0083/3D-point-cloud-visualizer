@@ -55,10 +55,10 @@
 
 ### 示例数据 (Demo Data)
 
-本仓库包含一个大体积点云文件示例，用于测试应用处理大型数据的能力。
+本仓库包含一个小体积点云文件示例和一个大体积点云文件示例，用于测试应用处理大型数据的能力。
 
-- **[large_example.txt](762 MB)(https://github.com/Archer0083/3D-point-cloud-visualizer/blob/main/large_example.txt)**
-- **[small_example.obj](24 MB)(https://archer0083.github.io/3D-point-cloud-visualizer/small_example.obj)** 
+- **[large_example.txt]762 MB(https://github.com/Archer0083/3D-point-cloud-visualizer/blob/main/large_example.txt)**
+- **[small_example.obj]24 MB(https://archer0083.github.io/3D-point-cloud-visualizer/small_example.obj)** 
 
 *注意: 此文件通过 Git LFS 存储。*
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三维点云/模型可视化器</title>
+    <title>三维点云/模型可视化器 v3.8.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,7 @@
         input[type=range]:hover { opacity: 1; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #4299e1; cursor: pointer; border-radius: 50%; }
         .btn-active { background-color: #3b82f6 !important; color: white !important; }
-        #preprocess-modal-content { max-height: 85vh; }
+        #preprocess-modal-content, #example-modal-content { max-height: 85vh; }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -29,6 +29,19 @@
             <div id="progress-bar" class="bg-blue-600 h-4 rounded-full" style="width: 0%"></div>
         </div>
         <p id="progress-text" class="text-white text-lg font-semibold">正在加载...</p>
+    </div>
+
+    <!-- 在线示例选择模态窗口 -->
+    <div id="example-modal" class="hidden absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-80 flex justify-center items-center z-40 pointer-events-auto">
+        <div id="example-modal-content" class="bg-gray-800 rounded-lg shadow-2xl w-11/12 max-w-2xl flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h2 class="text-2xl font-bold">选择在线示例</h2>
+                <button id="example-close-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div id="example-list-container" class="p-4 overflow-y-auto">
+                <!-- 示例列表将在这里动态生成 -->
+            </div>
+        </div>
     </div>
 
     <!-- 预处理模态窗口 -->
@@ -72,12 +85,13 @@
         <header class="flex justify-between items-center">
             <div>
                 <h1 class="text-xl md:text-2xl font-bold text-white/90">三维点云/模型可视化器</h1>
-                <p class="text-xs text-gray-400/50">Developed by Archer0083</p>
+                <p class="text-xs text-gray-400/50">Developed by Yan Tan * Github:@Archer0083</p>
             </div>
             <div class="flex items-center space-x-4 pointer-events-auto">
+                <button id="load-example-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">加载在线示例</button>
                 <button id="close-model-btn" class="hidden bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">关闭模型</button>
-                <label for="file-input" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">上传文件</label>
-                <input type="file" id="file-input" class="hidden" accept=".txt,.xyz,.obj,.ply,.mtl,.jpg,.jpeg,.png" multiple>
+                <label for="file-input" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">打开本地文件</label>
+                <input type="file" id="file-input" class="hidden" accept=".txt,.xyz,.obj,.ply" multiple>
             </div>
         </header>
         <div id="info-panel" class="panel absolute bottom-4 left-4 p-4 rounded-lg shadow-lg max-w-xs pointer-events-auto"><h2 class="font-bold text-lg mb-2 border-b border-gray-600 pb-1">操作指南</h2><ul class="text-sm space-y-1 text-gray-300"><li><strong class="text-white">拾取点:</strong> (指针模式下) 单击左键</li><li><strong class="text-white">旋转:</strong> 按住鼠标左键拖动</li><li><strong class="text-white">缩放:</strong> 滚动鼠标滚轮</li><li><strong class="text-white">平移:</strong> 按住鼠标右键拖动</li></ul><div class="mt-2 pt-2 border-t border-gray-600 text-xs"><p class="text-gray-300">支持格式: .txt, .xyz, .obj, .ply</p></div><div id="model-info" class="mt-3 pt-2 border-t border-gray-600 text-xs text-gray-400"></div></div>
@@ -90,25 +104,24 @@
     <script type="module">
         /*
          * 三维点云/模型可视化器 (3D Point Cloud / Model Visualizer)
-         * 版本 (Version): 3.2
-         * 开发者 (Developer): Archer0083
+         * 版本 (Version): 3.8.2
+         * 开发者 (Developer): Yan Tan * Github:@Archer0083
          * 描述 (Description): 一个基于 Three.js 的Web应用，用于加载、预处理和可视化多种三维点云和模型文件。
          */
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-        import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
-        import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
-
+        
         // --- 全局变量 ---
         let scene, camera, renderer, controls, currentObject, raycaster, mouse, pickedPointMarker;
         let interactionMode = 'picking';
         let preprocessScene, preprocessCamera, preprocessRenderer, preprocessControls, preprocessPoints;
-        let currentFile, columnMappings, mappingHistory; // 使用 File 对象
+        let currentFile, columnMappings, mappingHistory;
+        let parserWorker;
 
         // --- DOM 元素 ---
         const DOM = {
             container: document.getElementById('container'), fileInput: document.getElementById('file-input'),
+            loadExampleBtn: document.getElementById('load-example-btn'),
             modelInfo: document.getElementById('model-info'), pickingInfoPanel: document.getElementById('picking-info-panel'),
             pickingData: document.getElementById('picking-data'), pointSizeSlider: document.getElementById('point-size-slider'),
             opacitySlider: document.getElementById('opacity-slider'), bgDarkBtn: document.getElementById('bg-dark-btn'),
@@ -120,7 +133,29 @@
             preprocessPreviewContainer: document.getElementById('preprocess-preview-container'), preprocessUndoBtn: document.getElementById('preprocess-undo-btn'),
             preprocessCloseBtn: document.getElementById('preprocess-close-btn'), preprocessApplyBtn: document.getElementById('preprocess-apply-btn'),
             thinningSlider: document.getElementById('thinning-slider'), thinningValue: document.getElementById('thinning-value'),
+            exampleModal: document.getElementById('example-modal'), exampleListContainer: document.getElementById('example-list-container'),
+            exampleCloseBtn: document.getElementById('example-close-btn'),
         };
+
+        // --- 在线示例数据 ---
+        const onlineExamples = [
+            {
+                name: 'small_example.obj',
+                description: '一个小型OBJ格式点云，用于快速体验核心功能。',
+                size: '约 24 MB',
+                url: 'https://archer0083.github.io/3D-point-cloud-visualizer/small_example.obj',
+                mappings: ['x', 'y', 'z', 'r', 'g', 'b'],
+                thinningFactor: 1,
+            },
+            {
+                name: 'large_example.txt',
+                description: '一个未经处理的大型点云，用于测试应用的流式处理和性能极限。加载时间可能较长。',
+                size: '约 762 MB',
+                url: 'https://media.githubusercontent.com/media/Archer0083/3D-point-cloud-visualizer/main/large_example.txt',
+                mappings: ['x', 'y', 'z', 'r', 'g', 'b', 'ignore', 'ignore', 'ignore'],
+                thinningFactor: 100,
+            }
+        ];
 
         // --- 动画循环 ---
         function animateMainScene() { requestAnimationFrame(animateMainScene); controls.update(); renderer.render(scene, camera); }
@@ -189,7 +224,16 @@
         // --- 预处理逻辑 ---
         async function showPreprocessModal(file) {
             currentFile = file;
-            const previewContent = await readFirstLines(file, 200);
+            const extension = file.name.split('.').pop().toLowerCase();
+            let previewContent = await readFirstLines(file, 200);
+
+            if (extension === 'obj') {
+                previewContent = previewContent.split('\n')
+                    .filter(line => line.trim().startsWith('v '))
+                    .map(line => line.trim().substring(2).trim())
+                    .join('\n');
+            }
+
             const allLines = previewContent.replace(/^\uFEFF/, '').split('\n');
             let dataStartIndex = -1;
             for (let i = 0; i < allLines.length; i++) {
@@ -210,7 +254,7 @@
             const defaultMappings = ['x', 'y', 'z', 'r', 'g', 'b'];
             for (let i = 0; i < Math.min(numColumns, defaultMappings.length); i++) { columnMappings[i] = defaultMappings[i]; }
             
-            mappingHistory = []; // 修复：在这里初始化 mappingHistory
+            mappingHistory = [];
             saveMappingState();
 
             DOM.columnMappingContainer.innerHTML = '';
@@ -261,7 +305,15 @@
         
         async function updatePreprocessPreview() {
             const thinningFactor = parseInt(DOM.thinningSlider.value);
-            const previewContent = await readFirstLines(currentFile, 10000);
+            let previewContent = await readFirstLines(currentFile, 10000);
+            const extension = currentFile.name.split('.').pop().toLowerCase();
+            if (extension === 'obj') {
+                 previewContent = previewContent.split('\n')
+                    .filter(line => line.trim().startsWith('v '))
+                    .map(line => line.trim().substring(2).trim())
+                    .join('\n');
+            }
+
             const { vertices, colors } = parseDataWithMappings(previewContent, columnMappings, thinningFactor);
             if (preprocessPoints) { preprocessScene.remove(preprocessPoints); preprocessPoints.geometry.dispose(); preprocessPoints.material.dispose(); }
             if (vertices.length === 0) return;
@@ -319,23 +371,15 @@
         }
         function closePreprocessModal() { DOM.preprocessModal.classList.add('hidden'); DOM.preprocessModal.classList.remove('flex'); currentFile = null; }
 
-        async function applyPreprocessAndVisualize() {
+        function applyPreprocessAndVisualize() {
             showProgress("正在处理文件...");
             const thinningFactor = parseInt(DOM.thinningSlider.value);
-            const { vertices, colors } = await parseFileStream(currentFile, columnMappings, thinningFactor);
-            showProgress("正在生成模型...");
-            setTimeout(() => {
-                const { transformedVertices, transform } = transformToLocalMeters(vertices);
-                const geometry = new THREE.BufferGeometry();
-                geometry.setAttribute('position', new THREE.Float32BufferAttribute(transformedVertices, 3));
-                if (colors.length > 0) geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-                const material = new THREE.PointsMaterial({ size: 0.05, vertexColors: colors.length > 0 });
-                if (colors.length === 0) material.color.set(0x00aaff);
-                const points = new THREE.Points(geometry, material);
-                displayLoadedObject(points, currentFile.name, transform);
-                hideProgress();
-                closePreprocessModal();
-            }, 50);
+            
+            parserWorker.postMessage({
+                file: currentFile,
+                mappings: columnMappings,
+                thinningFactor: thinningFactor
+            });
         }
 
         function transformToLocalMeters(vertices) {
@@ -365,28 +409,11 @@
         async function onFileSelected(event) {
             const files = event.target.files;
             if (!files || files.length === 0) return;
+            
             showProgress("正在准备文件...");
             
-            const fileMap = {};
-            for (const file of files) {
-                fileMap[file.name.split('.').pop().toLowerCase()] = file;
-                fileMap[file.name] = file;
-            }
-            
-            const objFile = fileMap['obj'];
-            const plyFile = fileMap['ply'];
-            const txtFile = fileMap['txt'] || fileMap['xyz'];
-
-            if (objFile && fileMap['mtl']) {
-                alert("带纹理的OBJ模型暂不支持流式处理。");
-                hideProgress();
-            } else if (txtFile || plyFile || objFile) {
-                const fileToProcess = txtFile || plyFile || objFile;
-                await showPreprocessModal(fileToProcess);
-            } else {
-                alert("未找到支持的文件或文件组合。");
-                hideProgress();
-            }
+            const fileToProcess = files[0];
+            await showPreprocessModal(fileToProcess);
             DOM.fileInput.value = '';
         }
 
@@ -404,57 +431,38 @@
             reader.cancel();
             return content.split('\n').slice(0, maxLines).join('\n');
         }
-
-        async function parseFileStream(file, mappings, thinningFactor = 1) {
-            const fileSize = file.size;
-            let bytesRead = 0;
-
-            const stream = file.stream();
-            const reader = stream.getReader();
-
-            const vertices = [], colors = [];
-            const hasColor = mappings.some(m => ['r','g','b'].includes(m));
-            let lineCounter = 0;
-            let incompleteLine = '';
-
-            const decoder = new TextDecoder();
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                bytesRead += value.byteLength;
-                updateProgressBar((bytesRead / fileSize) * 100, `正在读取文件... ${Math.round((bytesRead / fileSize) * 100)}%`);
-
-                const chunk = incompleteLine + decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
-                incompleteLine = lines.pop(); // Last part might be incomplete
-
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine === '' || isNaN(parseFloat(trimmedLine.split(/\s+/)[0]))) continue;
-
-                    if (lineCounter % thinningFactor === 0) {
-                        const parts = trimmedLine.split(/\s+/);
-                        if (parts.length >= mappings.length) {
-                            let x=0, y=0, z=0, r=1, g=1, b=1, isValid = true;
-                            for (let i = 0; i < mappings.length; i++) {
-                                const val = parseFloat(parts[i]);
-                                if (isNaN(val)) { isValid = false; break; }
-                                switch (mappings[i]) {
-                                    case 'x': x = val; break; case 'y': y = val; break; case 'z': z = val; break;
-                                    case 'r': r = val > 1 ? val / 255 : val; break; case 'g': g = val > 1 ? val / 255 : val; break; case 'b': b = val > 1 ? val / 255 : val; break;
-                                }
-                            }
-                            if (isValid) { vertices.push(x, y, z); if (hasColor) colors.push(r, g, b); }
-                        }
-                    }
-                    lineCounter++;
-                }
-            }
-            return { vertices, colors };
-        }
         
+        function loadOnlineExample(example) {
+            DOM.exampleModal.classList.add('hidden');
+            showProgress("正在连接服务器...");
+
+            parserWorker.postMessage({
+                url: example.url,
+                fileName: example.name,
+                mappings: example.mappings,
+                thinningFactor: example.thinningFactor
+            });
+        }
+
+        function openExampleModal() {
+            DOM.exampleListContainer.innerHTML = '';
+            onlineExamples.forEach(example => {
+                const exampleEl = document.createElement('div');
+                exampleEl.className = 'p-4 bg-gray-700 rounded-lg mb-3 flex justify-between items-center';
+                exampleEl.innerHTML = `
+                    <div>
+                        <h4 class="font-bold text-lg">${example.name}</h4>
+                        <p class="text-sm text-gray-400">${example.description}</p>
+                        <p class="text-xs text-gray-500 mt-1">文件大小: ${example.size}</p>
+                    </div>
+                    <button class="load-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg ml-4">加载</button>
+                `;
+                exampleEl.querySelector('.load-btn').onclick = () => loadOnlineExample(example);
+                DOM.exampleListContainer.appendChild(exampleEl);
+            });
+            DOM.exampleModal.classList.remove('hidden');
+        }
+
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -560,12 +568,167 @@
             setupEventListeners();
             generateSamplePointCloud();
             animateMainScene();
+            
+            const workerScript = `
+                self.onmessage = async (e) => {
+                    const { file, url, fileName, mappings, thinningFactor } = e.data;
+                    try {
+                        let stream, fileSize = 0;
+                        let name = fileName;
+                        if (file) {
+                            stream = file.stream();
+                            fileSize = file.size;
+                            name = file.name;
+                        } else if (url) {
+                            const response = await fetch(url);
+                            if (!response.ok) throw new Error(\`服务器响应错误: \${response.statusText}\`);
+                            fileSize = +response.headers.get('Content-Length');
+                            stream = response.body;
+                        } else {
+                            throw new Error("No file or URL provided.");
+                        }
+                        const { vertices, colors } = await parseStream(stream, fileSize, mappings, thinningFactor, name.split('.').pop().toLowerCase());
+                        const { transformedVertices, transform } = transformToLocalMeters(vertices);
+                        const positionBuffer = new Float32Array(transformedVertices).buffer;
+                        const colorBuffer = new Float32Array(colors).buffer;
+                        self.postMessage({
+                            type: 'result',
+                            payload: {
+                                vertices: positionBuffer,
+                                colors: colorBuffer,
+                                transform: transform,
+                                fileName: name
+                            }
+                        }, [positionBuffer, colorBuffer]);
+                    } catch (error) {
+                        self.postMessage({
+                            type: 'error',
+                            payload: { message: error.message }
+                        });
+                    }
+                };
+
+                async function parseStream(stream, fileSize, mappings, thinningFactor = 1, extension = 'txt') {
+                    let bytesRead = 0;
+                    const reader = stream.getReader();
+                    const vertices = [], colors = [];
+                    const hasColor = mappings.some(m => ['r', 'g', 'b'].includes(m));
+                    let lineCounter = 0;
+                    let incompleteLine = '';
+                    const decoder = new TextDecoder();
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        bytesRead += value.byteLength;
+                        if (fileSize > 0) {
+                            self.postMessage({
+                                type: 'progress',
+                                payload: {
+                                    percent: (bytesRead / fileSize) * 100,
+                                    text: \`正在读取文件... \${Math.round((bytesRead / fileSize) * 100)}%\`
+                                }
+                            });
+                        }
+                        const chunk = incompleteLine + decoder.decode(value, { stream: true });
+                        const lines = chunk.split('\\n');
+                        incompleteLine = lines.pop();
+                        for (const line of lines) {
+                            let trimmedLine = line.trim();
+                            if (extension === 'obj') {
+                                if (!trimmedLine.startsWith('v ')) continue;
+                                trimmedLine = trimmedLine.substring(2).trim();
+                            }
+                            if (trimmedLine === '' || isNaN(parseFloat(trimmedLine.split(/\\s+/)[0]))) continue;
+                            if (lineCounter % thinningFactor === 0) {
+                                const parts = trimmedLine.split(/\\s+/);
+                                if (parts.length >= mappings.length) {
+                                    let x = 0, y = 0, z = 0, r = 1, g = 1, b = 1, isValid = true;
+                                    for (let i = 0; i < mappings.length; i++) {
+                                        const val = parseFloat(parts[i]);
+                                        if (isNaN(val)) { isValid = false; break; }
+                                        switch (mappings[i]) {
+                                            case 'x': x = val; break;
+                                            case 'y': y = val; break;
+                                            case 'z': z = val; break;
+                                            case 'r': r = val > 1 ? val / 255 : val; break;
+                                            case 'g': g = val > 1 ? val / 255 : val; break;
+                                            case 'b': b = val > 1 ? val / 255 : val; break;
+                                        }
+                                    }
+                                    if (isValid) {
+                                        vertices.push(x, y, z);
+                                        if (hasColor) colors.push(r, g, b);
+                                    }
+                                }
+                            }
+                            lineCounter++;
+                        }
+                    }
+                    return { vertices, colors };
+                }
+
+                function transformToLocalMeters(vertices) {
+                    if (vertices.length === 0) return { transformedVertices: [], transform: null };
+                    let minX = Infinity, minY = Infinity, minZ = Infinity;
+                    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+                    for(let i = 0; i < vertices.length; i += 3) {
+                        minX = Math.min(minX, vertices[i]);
+                        minY = Math.min(minY, vertices[i+1]);
+                        minZ = Math.min(minZ, vertices[i+2]);
+                        maxX = Math.max(maxX, vertices[i]);
+                        maxY = Math.max(maxY, vertices[i+1]);
+                        maxZ = Math.max(maxZ, vertices[i+2]);
+                    }
+                    const center = { x: minX + (maxX - minX) / 2, y: minY + (maxY - minY) / 2, z: minZ + (maxZ - minZ) / 2 };
+                    const R = 6378137;
+                    const metersPerDegreeLat = R * (Math.PI / 180);
+                    const metersPerDegreeLon = metersPerDegreeLat * Math.cos(center.y * Math.PI / 180);
+                    const transformedVertices = [];
+                    for (let i = 0; i < vertices.length; i += 3) {
+                        transformedVertices.push((vertices[i] - center.x) * metersPerDegreeLon);
+                        transformedVertices.push((vertices[i + 1] - center.y) * metersPerDegreeLat);
+                        transformedVertices.push(vertices[i + 2] - center.z);
+                    }
+                    const transform = { center, metersPerDegree: { lon: metersPerDegreeLon, lat: metersPerDegreeLat } };
+                    return { transformedVertices, transform };
+                }
+            `;
+            const blob = new Blob([workerScript], { type: 'application/javascript' });
+            parserWorker = new Worker(URL.createObjectURL(blob));
+
+            parserWorker.onmessage = (e) => {
+                const { type, payload } = e.data;
+                if (type === 'progress') {
+                    updateProgressBar(payload.percent, payload.text);
+                } else if (type === 'result') {
+                    showProgress("正在生成模型...");
+                    setTimeout(() => {
+                        const { vertices, colors, transform, fileName } = payload;
+                        const geometry = new THREE.BufferGeometry();
+                        geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(vertices), 3));
+                        if (colors.byteLength > 0) {
+                            geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colors), 3));
+                        }
+                        const material = new THREE.PointsMaterial({ size: 0.05, vertexColors: colors.byteLength > 0 });
+                        if (colors.byteLength === 0) material.color.set(0x00aaff);
+                        const points = new THREE.Points(geometry, material);
+                        displayLoadedObject(points, fileName, transform);
+                        hideProgress();
+                        closePreprocessModal();
+                    }, 50);
+                } else if (type === 'error') {
+                    alert(`处理文件时出错: ${payload.message}`);
+                    hideProgress();
+                }
+            };
         }
 
         // --- 事件监听 ---
         function setupEventListeners() {
             window.addEventListener('resize', onWindowResize);
             DOM.fileInput.addEventListener('change', onFileSelected);
+            DOM.loadExampleBtn.addEventListener('click', openExampleModal);
+            DOM.exampleCloseBtn.addEventListener('click', () => DOM.exampleModal.classList.add('hidden'));
             DOM.pointSizeSlider.addEventListener('input', handlePointSizeChange);
             DOM.opacitySlider.addEventListener('input', handleOpacityChange);
             DOM.bgDarkBtn.addEventListener('click', () => setBackgroundTheme('dark'));

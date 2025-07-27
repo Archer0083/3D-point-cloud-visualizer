@@ -4,7 +4,7 @@
 
 一个基于Web的、功能强大的、交互式三维点云和模型可视化分析工具。无需安装任何软件，直接在浏览器中运行。
 
-[**在线访问 (Live Demo) - 最新版 v3.3**](https://Archer0083.github.io/3D-point-cloud-visualizer/)
+[**在线访问 (Live Demo) - 最新版 v3.8**](https://Archer0083.github.io/3D-point-cloud-visualizer//v3.8.html)
 
 ---
 
@@ -42,7 +42,10 @@
 - **完善的模型管理**: 支持一键清空当前场景。
 
 ### 更新日志 (Changelog)
-
+**v3.8** - [点击访问该版本](https://archer0083.github.io/3D-point-cloud-visualizer/v3.8.html)
+- **【功能增强】** 新增**在线示例加载器**，提供一个包含大、小两种点云的列表供用户选择，实现一键在线体验。
+- **【核心升级】**  在预处理窗口中加入了点云稀疏化功能，通过流式处理和顺序抽稀，增强了文件解析器，现在能够智能识别在线案例.obj文件中的顶点数据，并将其作为点云进行预处理。
+  
 **v3.2** - [点击访问该版本](https://archer0083.github.io/3D-point-cloud-visualizer/v3.2.html)
 - **【重要修复】** 修复了因浏览器安全策略导致的文件上传功能在某些环境下（如嵌入式预览）失效的问题。
 - **【核心升级】** 回归并优化了基于标准文件输入（`<input type="file">`）的**文件流式处理引擎**，在预处理窗口中加入了**点云稀疏化**功能，通过流式处理和顺序抽稀，从根本上解决了因浏览器内存限制导致的大型点云文件（>500MB）加载失败的问题。
@@ -54,7 +57,8 @@
 
 本仓库包含一个大体积点云文件示例，用于测试应用处理大型数据的能力。
 
-- **[large_example.txt](https://github.com/Archer0083/3D-point-cloud-visualizer/blob/main/large_example.txt)** 
+- **[large_example.txt](762 MB)(https://github.com/Archer0083/3D-point-cloud-visualizer/blob/main/large_example.txt)**
+- **[small_example.obj](24 MB)(https://archer0083.github.io/3D-point-cloud-visualizer/small_example.obj)** 
 
 *注意: 此文件通过 Git LFS 存储。*
 

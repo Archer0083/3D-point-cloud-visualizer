@@ -47,7 +47,7 @@ A powerful, web-based, interactive tool for 3D point cloud and model visualizati
   **Auto Coordinate Normalization**: Resolves floating-point precision issues with large coordinates (e.g., GPS).  
 - **自适应轴向缩放**: 自动校正经纬度和高程间的尺度差异，保证模型不变形。  
   **Adaptive Axis Scaling**: Automatically corrects scale differences between lat/lon and elevation to avoid distortion.
-  **可选坐标系**: 用户可在预处理阶段明确指定数据是 **地理坐标** (WGS84)还是 **笛卡尔坐标**。  
+-**可选坐标系**: 用户可在预处理阶段明确指定数据是 **地理坐标** (WGS84)还是 **笛卡尔坐标**。  
   **Selectable Coordinate Systems**: Users can specify whether the data is in **Geographic** (WGS84) or **Cartesian** coordinates during preprocessing.  
 - **智能坐标转换**: 对地理坐标数据，应用会进行专业转换，保证模型不变形；对笛卡尔坐标数据，则仅进行中心化处理，保留原始尺寸和比例。  
   **Intelligent Transformation**:  Correctly transforms geographic data to a local meter-based system for distortion-free viewing, or simply centers Cartesian data while preserving its original scale.

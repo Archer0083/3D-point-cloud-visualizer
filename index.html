@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三维点云/模型可视化器 v3.8</title>
+    <title>三维点云/模型可视化器 v3.9.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,12 +31,12 @@
         <p id="progress-text" class="text-white text-lg font-semibold">正在加载...</p>
     </div>
 
-    <!-- 新增：在线示例选择模态窗口 -->
+    <!-- 在线示例选择模态窗口 -->
     <div id="example-modal" class="hidden absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-80 flex justify-center items-center z-40 pointer-events-auto">
         <div id="example-modal-content" class="bg-gray-800 rounded-lg shadow-2xl w-11/12 max-w-2xl flex flex-col overflow-hidden">
             <div class="p-4 border-b border-gray-700 flex justify-between items-center">
                 <h2 class="text-2xl font-bold">选择在线示例</h2>
-                <button id="example-close-btn" class="text-gray-400 hover:text-white">&times;</button>
+                <button id="example-close-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
             </div>
             <div id="example-list-container" class="p-4 overflow-y-auto">
                 <!-- 示例列表将在这里动态生成 -->
@@ -55,6 +55,16 @@
                 <div class="w-full md:w-1/2 p-4 overflow-y-auto">
                     <h3 class="font-semibold mb-2">列映射设置</h3>
                     <div id="column-mapping-container" class="space-y-2"></div>
+                    
+                    <div class="mt-4 pt-4 border-t border-gray-700">
+                        <h3 class="font-semibold mb-2">坐标系设置</h3>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="is-latlon-checkbox" class="bg-gray-600 rounded" onchange="window.updatePreprocessPreview()">
+                            <span>数据为经纬度坐标 (WGS84)</span>
+                        </label>
+                        <p class="text-xs text-gray-400 mt-1">若您的数据已是笛卡尔坐标系(如CAD模型)，请勿勾选。</p>
+                    </div>
+
                     <div class="mt-4 pt-4 border-t border-gray-700">
                         <h3 class="font-semibold mb-2">性能优化</h3>
                         <div>
@@ -85,7 +95,7 @@
         <header class="flex justify-between items-center">
             <div>
                 <h1 class="text-xl md:text-2xl font-bold text-white/90">三维点云/模型可视化器</h1>
-                <p class="text-xs text-gray-400/50">Developed by Yan Tan * Github:@Archer0083</p>
+                <p class="text-xs text-gray-400/50">v3.9.0 | Developed by Yan Tan * Github:@Archer0083</p>
             </div>
             <div class="flex items-center space-x-4 pointer-events-auto">
                 <button id="load-example-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">加载在线示例</button>
@@ -104,7 +114,7 @@
     <script type="module">
         /*
          * 三维点云/模型可视化器 (3D Point Cloud / Model Visualizer)
-         * 版本 (Version): 3.8
+         * 版本 (Version): 3.9.0
          * 开发者 (Developer): Yan Tan * Github:@Archer0083
          * 描述 (Description): 一个基于 Three.js 的Web应用，用于加载、预处理和可视化多种三维点云和模型文件。
          */
@@ -113,6 +123,7 @@
         
         // --- 全局变量 ---
         let scene, camera, renderer, controls, currentObject, raycaster, mouse, pickedPointMarker;
+        let texturePickingCanvas, texturePickingCtx;
         let interactionMode = 'picking';
         let preprocessScene, preprocessCamera, preprocessRenderer, preprocessControls, preprocessPoints;
         let currentFile, columnMappings, mappingHistory;
@@ -135,25 +146,26 @@
             thinningSlider: document.getElementById('thinning-slider'), thinningValue: document.getElementById('thinning-value'),
             exampleModal: document.getElementById('example-modal'), exampleListContainer: document.getElementById('example-list-container'),
             exampleCloseBtn: document.getElementById('example-close-btn'),
+            isLatLonCheckbox: document.getElementById('is-latlon-checkbox'),
         };
 
         // --- 在线示例数据 ---
         const onlineExamples = [
             {
                 name: 'small_example.obj',
-                description: '一个经过稀疏化处理的小型点云，用于快速体验核心功能。',
-                size: '约 20 MB',
-                url: 'https://media.githubusercontent.com/media/Archer0083/3D-point-cloud-visualizer/main/small_example.obj', 
-                mappings: ['x', 'y', 'z', 'r', 'g', 'b', 'ignore', 'ignore', 'ignore'],
+                description: '一个小型OBJ格式点云，用于快速体验核心功能。',
+                size: '约 24 MB',
+                url: 'https://archer0083.github.io/3D-point-cloud-visualizer/small_example.obj',
+                mappings: ['x', 'y', 'z', 'r', 'g', 'b'],
                 thinningFactor: 1,
             },
             {
                 name: 'large_example.txt',
                 description: '一个未经处理的大型点云，用于测试应用的流式处理和性能极限。加载时间可能较长。',
-                size: '约 799 MB',
+                size: '约 762 MB',
                 url: 'https://media.githubusercontent.com/media/Archer0083/3D-point-cloud-visualizer/main/large_example.txt',
                 mappings: ['x', 'y', 'z', 'r', 'g', 'b', 'ignore', 'ignore', 'ignore'],
-                thinningFactor: 100, // 为大文件设置一个默认的稀疏度
+                thinningFactor: 100,
             }
         ];
 
@@ -238,7 +250,7 @@
             let dataStartIndex = -1;
             for (let i = 0; i < allLines.length; i++) {
                 const trimmedLine = allLines[i].trim();
-                if (trimmedLine !== '' && !isNaN(parseFloat(trimmedLine.split(/\s+/)[0]))) {
+                if (trimmedLine !== '' && !trimmedLine.startsWith('#') && !isNaN(parseFloat(trimmedLine.split(/\s+/)[0]))) {
                     dataStartIndex = i;
                     break;
                 }
@@ -267,6 +279,7 @@
                 select.value = columnMappings[i];
                 select.addEventListener('change', onMappingChange);
             }
+            DOM.isLatLonCheckbox.checked = false;
             DOM.thinningSlider.value = 1;
             DOM.thinningValue.textContent = '无稀疏';
             DOM.preprocessModal.classList.remove('hidden');
@@ -303,12 +316,13 @@
             updatePreprocessPreview();
         }
         
-        async function updatePreprocessPreview() {
+        window.updatePreprocessPreview = async function() {
             const thinningFactor = parseInt(DOM.thinningSlider.value);
+            const isLatLon = DOM.isLatLonCheckbox.checked;
             let previewContent = await readFirstLines(currentFile, 10000);
             const extension = currentFile.name.split('.').pop().toLowerCase();
             if (extension === 'obj') {
-                 previewContent = previewContent.split('\n')
+                previewContent = previewContent.split('\n')
                     .filter(line => line.trim().startsWith('v '))
                     .map(line => line.trim().substring(2).trim())
                     .join('\n');
@@ -317,9 +331,11 @@
             const { vertices, colors } = parseDataWithMappings(previewContent, columnMappings, thinningFactor);
             if (preprocessPoints) { preprocessScene.remove(preprocessPoints); preprocessPoints.geometry.dispose(); preprocessPoints.material.dispose(); }
             if (vertices.length === 0) return;
-            const { transformedVertices } = transformToLocalMeters(vertices);
+
+            const { transformedVertices } = transformCoordinatesForPreview(vertices, isLatLon);
+            
             const geometry = new THREE.BufferGeometry();
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(transformedVertices, 3));
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(transformedVertices), 3));
             if (colors.length > 0) geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
             const material = new THREE.PointsMaterial({ size: 0.05, vertexColors: colors.length > 0 });
             if (colors.length === 0) material.color.set(0x00aaff);
@@ -339,7 +355,7 @@
             let lineCounter = 0;
             for (const line of lines) {
                 const trimmedLine = line.trim();
-                if (trimmedLine === '' || isNaN(parseFloat(trimmedLine.split(/\s+/)[0]))) continue;
+                if (trimmedLine === '' || trimmedLine.startsWith('#') || isNaN(parseFloat(trimmedLine.split(/\s+/)[0]))) continue;
                 if (lineCounter % thinningFactor === 0) {
                     const parts = trimmedLine.split(/\s+/);
                     if (parts.length >= mappings.length) {
@@ -374,16 +390,19 @@
         function applyPreprocessAndVisualize() {
             showProgress("正在处理文件...");
             const thinningFactor = parseInt(DOM.thinningSlider.value);
+            const isLatLon = DOM.isLatLonCheckbox.checked;
             
             parserWorker.postMessage({
                 file: currentFile,
                 mappings: columnMappings,
-                thinningFactor: thinningFactor
+                thinningFactor: thinningFactor,
+                isLatLon: isLatLon
             });
         }
 
-        function transformToLocalMeters(vertices) {
-            if (vertices.length === 0) return { transformedVertices: [], transform: null };
+        function transformCoordinatesForPreview(vertices, isLatLon) {
+            if (vertices.length === 0) return { transformedVertices: [] };
+            
             const box = new THREE.Box3();
             const tempVec = new THREE.Vector3();
             for(let i = 0; i < vertices.length; i += 3) {
@@ -392,20 +411,27 @@
             }
             const center = new THREE.Vector3();
             box.getCenter(center);
-            const R = 6378137;
-            const metersPerDegreeLat = R * (Math.PI / 180);
-            const metersPerDegreeLon = metersPerDegreeLat * Math.cos(center.y * Math.PI / 180);
             const transformedVertices = [];
-            for (let i = 0; i < vertices.length; i += 3) {
-                transformedVertices.push((vertices[i] - center.x) * metersPerDegreeLon);
-                transformedVertices.push((vertices[i + 1] - center.y) * metersPerDegreeLat);
-                transformedVertices.push(vertices[i + 2] - center.z);
+
+            if (isLatLon) {
+                const R = 6378137;
+                const metersPerDegreeLat = R * (Math.PI / 180);
+                const metersPerDegreeLon = metersPerDegreeLat * Math.cos(center.y * Math.PI / 180);
+                for (let i = 0; i < vertices.length; i += 3) {
+                    transformedVertices.push((vertices[i] - center.x) * metersPerDegreeLon);
+                    transformedVertices.push((vertices[i + 1] - center.y) * metersPerDegreeLat);
+                    transformedVertices.push(vertices[i + 2] - center.z);
+                }
+            } else {
+                 for (let i = 0; i < vertices.length; i += 3) {
+                    transformedVertices.push(vertices[i] - center.x);
+                    transformedVertices.push(vertices[i + 1] - center.y);
+                    transformedVertices.push(vertices[i + 2] - center.z);
+                }
             }
-            const transform = { center, metersPerDegree: { lon: metersPerDegreeLon, lat: metersPerDegreeLat } };
-            return { transformedVertices, transform };
+            return { transformedVertices };
         }
         
-        // --- 文件加载与解析 ---
         async function onFileSelected(event) {
             const files = event.target.files;
             if (!files || files.length === 0) return;
@@ -440,10 +466,11 @@
                 url: example.url,
                 fileName: example.name,
                 mappings: example.mappings,
-                thinningFactor: example.thinningFactor
+                thinningFactor: example.thinningFactor,
+                isLatLon: example.url.includes('large_example')
             });
         }
-
+        
         function openExampleModal() {
             DOM.exampleListContainer.innerHTML = '';
             onlineExamples.forEach(example => {
@@ -474,6 +501,7 @@
                 preprocessRenderer.setSize(width, height);
             }
         }
+
         function onCanvasClick(event) {
             if (interactionMode !== 'picking' || !currentObject) return;
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -483,13 +511,34 @@
             if (intersects.length > 0) {
                 const i = intersects[0];
                 const localPosition = i.point.clone();
-                const originalPosition = i.point.clone();
+                const originalPosition = { x: 0, y: 0, z: 0 };
+                let positionHTML = '';
+
                 if (i.object.userData.transform) {
-                    const { center, metersPerDegree } = i.object.userData.transform;
-                    originalPosition.x = (localPosition.x / metersPerDegree.lon) + center.x;
-                    originalPosition.y = (localPosition.y / metersPerDegree.lat) + center.y;
-                    originalPosition.z = localPosition.z + center.z;
+                    const { type, center, metersPerDegree } = i.object.userData.transform;
+                    if (type === 'geographic') {
+                        originalPosition.x = (localPosition.x / metersPerDegree.lon) + center.x;
+                        originalPosition.y = (localPosition.y / metersPerDegree.lat) + center.y;
+                        originalPosition.z = localPosition.z + center.z;
+                        positionHTML = `
+                            <p class="font-semibold text-white">真实世界坐标 (WGS84):</p>
+                            <p>经度: ${originalPosition.x.toFixed(8)}</p>
+                            <p>纬度: ${originalPosition.y.toFixed(8)}</p>
+                            <p>高程: ${originalPosition.z.toFixed(3)} m</p>`;
+                    } else { // 'cartesian'
+                        originalPosition.x = localPosition.x + center.x;
+                        originalPosition.y = localPosition.y + center.y;
+                        originalPosition.z = localPosition.z + center.z;
+                        positionHTML = `
+                            <p class="font-semibold text-white">原始坐标:</p>
+                            <p>X: ${originalPosition.x.toFixed(3)}</p>
+                            <p>Y: ${originalPosition.y.toFixed(3)}</p>
+                            <p>Z: ${originalPosition.z.toFixed(3)}</p>`;
+                    }
+                } else {
+                     positionHTML = `<p class="font-semibold text-white">局部坐标:</p>`;
                 }
+
                 pickedPointMarker.position.copy(localPosition);
                 pickedPointMarker.visible = true;
                 let colorInfo = "N/A";
@@ -502,21 +551,18 @@
                 } else if (i.object.isMesh) {
                     const mat = i.object.material;
                     if (mat.map && i.uv) {
-                        const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
                         const img = mat.map.image;
-                        canvas.width = img.width; canvas.height = img.height;
-                        ctx.drawImage(img, 0, 0, img.width, img.height);
-                        const d = ctx.getImageData(Math.floor(i.uv.x * img.width), Math.floor((1 - i.uv.y) * img.height), 1, 1).data;
+                        if(texturePickingCanvas.width !== img.width) texturePickingCanvas.width = img.width;
+                        if(texturePickingCanvas.height !== img.height) texturePickingCanvas.height = img.height;
+                        texturePickingCtx.drawImage(img, 0, 0, img.width, img.height);
+                        const d = texturePickingCtx.getImageData(Math.floor(i.uv.x * img.width), Math.floor((1 - i.uv.y) * img.height), 1, 1).data;
                         colorInfo = `R: ${d[0]}, G: ${d[1]}, B: ${d[2]}`;
                     } else if (mat.color) {
                         colorInfo = `R: ${Math.floor(mat.color.r*255)}, G: ${Math.floor(mat.color.g*255)}, B: ${Math.floor(mat.color.b*255)}`;
                     }
                 }
                 DOM.pickingData.innerHTML = `
-                    <p class="font-semibold text-white">真实世界坐标:</p>
-                    <p>经度: ${originalPosition.x.toFixed(8)}</p>
-                    <p>纬度: ${originalPosition.y.toFixed(8)}</p>
-                    <p>高程: ${originalPosition.z.toFixed(3)} m</p>
+                    ${positionHTML}
                     <p class="font-semibold text-white mt-2">局部坐标 (米):</p>
                     <p>X: ${localPosition.x.toFixed(3)} m</p>
                     <p>Y: ${localPosition.y.toFixed(3)} m</p>
@@ -529,6 +575,7 @@
                 DOM.pickingInfoPanel.classList.add('hidden');
             }
         }
+
         function generateSamplePointCloud() {
             const vertices = [];
             for (let i = 0; i < 50000; i++) {
@@ -565,13 +612,17 @@
             pickedPointMarker = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true }));
             pickedPointMarker.visible = false;
             scene.add(pickedPointMarker);
+
+            texturePickingCanvas = document.createElement('canvas');
+            texturePickingCtx = texturePickingCanvas.getContext('2d', { willReadFrequently: true });
+
             setupEventListeners();
             generateSamplePointCloud();
             animateMainScene();
             
             const workerScript = `
                 self.onmessage = async (e) => {
-                    const { file, url, fileName, mappings, thinningFactor } = e.data;
+                    const { file, url, fileName, mappings, thinningFactor, isLatLon } = e.data;
                     try {
                         let stream, fileSize = 0;
                         let name = fileName;
@@ -588,8 +639,10 @@
                             throw new Error("No file or URL provided.");
                         }
                         const { vertices, colors } = await parseStream(stream, fileSize, mappings, thinningFactor, name.split('.').pop().toLowerCase());
-                        const { transformedVertices, transform } = transformToLocalMeters(vertices);
-                        const positionBuffer = new Float32Array(transformedVertices).buffer;
+                        
+                        const { transformedVertices, transform } = transformCoordinates(vertices, isLatLon);
+
+                        const positionBuffer = transformedVertices.buffer;
                         const colorBuffer = new Float32Array(colors).buffer;
                         self.postMessage({
                             type: 'result',
@@ -601,10 +654,7 @@
                             }
                         }, [positionBuffer, colorBuffer]);
                     } catch (error) {
-                        self.postMessage({
-                            type: 'error',
-                            payload: { message: error.message }
-                        });
+                        self.postMessage({ type: 'error', payload: { message: error.message } });
                     }
                 };
 
@@ -621,13 +671,7 @@
                         if (done) break;
                         bytesRead += value.byteLength;
                         if (fileSize > 0) {
-                            self.postMessage({
-                                type: 'progress',
-                                payload: {
-                                    percent: (bytesRead / fileSize) * 100,
-                                    text: \`正在读取文件... \${Math.round((bytesRead / fileSize) * 100)}%\`
-                                }
-                            });
+                            self.postMessage({ type: 'progress', payload: { percent: (bytesRead / fileSize) * 100, text: \`正在读取文件... \${Math.round((bytesRead / fileSize) * 100)}%\` }});
                         }
                         const chunk = incompleteLine + decoder.decode(value, { stream: true });
                         const lines = chunk.split('\\n');
@@ -638,27 +682,20 @@
                                 if (!trimmedLine.startsWith('v ')) continue;
                                 trimmedLine = trimmedLine.substring(2).trim();
                             }
-                            if (trimmedLine === '' || isNaN(parseFloat(trimmedLine.split(/\\s+/)[0]))) continue;
+                            if (trimmedLine === '' || trimmedLine.startsWith('#') || isNaN(parseFloat(trimmedLine.split(/\\s+/)[0]))) continue;
                             if (lineCounter % thinningFactor === 0) {
                                 const parts = trimmedLine.split(/\\s+/);
                                 if (parts.length >= mappings.length) {
-                                    let x = 0, y = 0, z = 0, r = 1, g = 1, b = 1, isValid = true;
+                                    let x=0, y=0, z=0, r=1, g=1, b=1, isValid = true;
                                     for (let i = 0; i < mappings.length; i++) {
                                         const val = parseFloat(parts[i]);
                                         if (isNaN(val)) { isValid = false; break; }
                                         switch (mappings[i]) {
-                                            case 'x': x = val; break;
-                                            case 'y': y = val; break;
-                                            case 'z': z = val; break;
-                                            case 'r': r = val > 1 ? val / 255 : val; break;
-                                            case 'g': g = val > 1 ? val / 255 : val; break;
-                                            case 'b': b = val > 1 ? val / 255 : val; break;
+                                            case 'x': x = val; break; case 'y': y = val; break; case 'z': z = val; break;
+                                            case 'r': r = val > 1 ? val / 255 : val; break; case 'g': g = val > 1 ? val / 255 : val; break; case 'b': b = val > 1 ? val / 255 : val; break;
                                         }
                                     }
-                                    if (isValid) {
-                                        vertices.push(x, y, z);
-                                        if (hasColor) colors.push(r, g, b);
-                                    }
+                                    if (isValid) { vertices.push(x, y, z); if (hasColor) colors.push(r, g, b); }
                                 }
                             }
                             lineCounter++;
@@ -667,29 +704,38 @@
                     return { vertices, colors };
                 }
 
-                function transformToLocalMeters(vertices) {
-                    if (vertices.length === 0) return { transformedVertices: [], transform: null };
+                function transformCoordinates(vertices, isLatLon) {
+                    if (vertices.length === 0) return { transformedVertices: new Float32Array(), transform: null };
+                    
                     let minX = Infinity, minY = Infinity, minZ = Infinity;
                     let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
                     for(let i = 0; i < vertices.length; i += 3) {
-                        minX = Math.min(minX, vertices[i]);
-                        minY = Math.min(minY, vertices[i+1]);
-                        minZ = Math.min(minZ, vertices[i+2]);
-                        maxX = Math.max(maxX, vertices[i]);
-                        maxY = Math.max(maxY, vertices[i+1]);
-                        maxZ = Math.max(maxZ, vertices[i+2]);
+                        const x = vertices[i], y = vertices[i+1], z = vertices[i+2];
+                        minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
+                        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
                     }
                     const center = { x: minX + (maxX - minX) / 2, y: minY + (maxY - minY) / 2, z: minZ + (maxZ - minZ) / 2 };
-                    const R = 6378137;
-                    const metersPerDegreeLat = R * (Math.PI / 180);
-                    const metersPerDegreeLon = metersPerDegreeLat * Math.cos(center.y * Math.PI / 180);
-                    const transformedVertices = [];
-                    for (let i = 0; i < vertices.length; i += 3) {
-                        transformedVertices.push((vertices[i] - center.x) * metersPerDegreeLon);
-                        transformedVertices.push((vertices[i + 1] - center.y) * metersPerDegreeLat);
-                        transformedVertices.push(vertices[i + 2] - center.z);
+                    const transformedVertices = new Float32Array(vertices.length);
+                    let transform;
+
+                    if (isLatLon) {
+                        const R = 6378137;
+                        const metersPerDegreeLat = R * (Math.PI / 180);
+                        const metersPerDegreeLon = metersPerDegreeLat * Math.cos(center.y * Math.PI / 180);
+                        for (let i = 0; i < vertices.length; i += 3) {
+                            transformedVertices[i] = (vertices[i] - center.x) * metersPerDegreeLon;
+                            transformedVertices[i + 1] = (vertices[i + 1] - center.y) * metersPerDegreeLat;
+                            transformedVertices[i + 2] = (vertices[i + 2] - center.z);
+                        }
+                        transform = { type: 'geographic', center, metersPerDegree: { lon: metersPerDegreeLon, lat: metersPerDegreeLat } };
+                    } else {
+                        for (let i = 0; i < vertices.length; i += 3) {
+                            transformedVertices[i] = vertices[i] - center.x;
+                            transformedVertices[i + 1] = vertices[i + 1] - center.y;
+                            transformedVertices[i + 2] = vertices[i + 2] - center.z;
+                        }
+                        transform = { type: 'cartesian', center };
                     }
-                    const transform = { center, metersPerDegree: { lon: metersPerDegreeLon, lat: metersPerDegreeLat } };
                     return { transformedVertices, transform };
                 }
             `;
